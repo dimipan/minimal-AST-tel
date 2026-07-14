@@ -1,0 +1,14 @@
+{
+  "format": "npz",
+  "allow_pickle": false,
+  "model": "qwen3-embedding",
+  "provider": "local Ollama",
+  "endpoint": "http://localhost:11434/api/embeddings",
+  "input": "Question and answer concatenated as one evidence item",
+  "dimension": 4096,
+  "normalization": "l2",
+  "corpus": "fully synthetic SAR hiker",
+  "evidence_count": 14,
+  "texts_sha256": "2fa5c5f86d60e2e0df2af4e2f6533d606e728e4a45d1ce0bf408ae0b43e8f7da",
+  "archive_sha256": "ddbb0aa56b52fbed3cd029461a30333e4271d5d6718cab1a89b14f82843f9980"
+}
