@@ -1,394 +1,220 @@
-# Acquisition-State Telemetry — public synthetic demonstration
+# Acquisition-State Telemetry
 
-Acquisition-State Telemetry (AST) is a substrate-agnostic monitor for an
-evolving information-acquisition process. It does not choose actions. It turns a
-declared acquisition state into two live channels:
+**A monitor that watches a process acquire information, and tells you when it stops making progress.**
 
-- **Bayesian Progress Estimator (`PE^B`)**: residual task-relevant acquisition pressure.
-- **Geometric Stalling Index (`SI^perp`)**: recurrent evidence with weak gain, suppressed as the relevant schema becomes resolved.
+It doesn't choose actions. It reads two channels:
 
-The **episodes and task data** in this repository are synthetic. The linguistic
-experiment uses real embeddings from the local Ollama model
-`qwen3-embedding`; synthetic/hash embeddings are available only as an explicit
-smoke-test fallback.
+- **PE** — how much of the task is still unresolved.
+- **SI** — whether evidence is repeating itself without producing anything new.
 
-This repository does not contain the paper's participant data, complete
-experimental suite, model checkpoints, private paths, or under-review results.
+The point of this repository is that the *same equations* watch three completely different things: a witness interview, a robot arm, and a Bayesian estimator. Only a thin adapter changes.
 
-## Architecture
+All data here is synthetic. Everything runs in under a minute with no GPU, no simulator, and no network.
 
-Each substrate declares a binding:
+```bash
+pip install -e .
+python exp_kinematic_evaluation.py     # robot arm
+python exp_boir_evaluation.py          # intent estimator
+python -m unittest discover -s tests   # 54 tests
+```
+
+---
+
+## How it works
+
+Each substrate declares a **binding** — four things, and nothing else:
 
 ```text
 B = (M, Y, S, e)
+
+M  what counts as "done"        a list of categories to resolve
+Y  what evidence looks like     an utterance, a robot frame, a posterior window
+S  how to score it              evidence -> how resolved is each category, 0..1
+e  how to represent it          evidence -> a vector
 ```
 
-- `M`: finite task schema;
-- `Y`: evidence space;
-- `S(y_t)`: bounded per-schema completeness scores;
-- `e(y_t)`: unit-normalised evidence representation.
+Everything after that line is shared and unchanged: the state integrator, the PE and SI equations, the calibration constants. Write those four things and the monitor works on your process. That's the whole claim, and the three substrates below are the test of it.
 
-Everything after that boundary is shared. `substrate_binding.py` performs
-monotone state integration and invokes the common equations in
-`telemetry_tools_geometric.py` with the shared values in
-`calibration_manifest.json`.
+Both channels come from one place — `telemetry_tools_geometric.py` — and every substrate writes the same JSONL trajectory format.
 
-“Shared” means the monitor settings are held constant across the included
-substrates. It does not mean the source files are cryptographically locked.
+---
 
-## Included substrates
+## The three substrates
 
-Three bindings: a language stream, a physical task, and **another inference
-process**. The third is what turns "substrate-agnostic" from a slogan into a
-claim with a test.
+### 1. Search-and-rescue interview (language)
 
-### Synthetic SAR hiker dialogue
+An interviewer questions a witness about a missing hiker. Eight things need establishing: location, time, description, equipment, and so on. Three runs:
 
-`corpus_hiker.py` contains a fully fictional search-and-rescue interview with
-an eight-category schema and three deterministic trajectories:
+| run | what happens | mean SI |
+|---|---|---|
+| efficient | every question lands new information | **0.006** |
+| agent repetition | the interviewer keeps re-asking a question already answered | 0.099 |
+| interviewee degradation | the witness has nothing left to give and says so, four different ways | 0.085 |
 
-- `efficient`;
-- `agent_repetition`;
-- `interviewee_degradation`.
+Evidence is embedded with a real `qwen3-embedding` model. The text is fictional; the embeddings are not.
 
-The default representation is a precomputed `qwen3-embedding` vector for each
-question-answer evidence item. The archive is stored as NPZ and loaded with
-`allow_pickle=False`.
+**What this means.** The monitor separates the two stall types *perfectly* — every stalled turn scores above every productive turn, in both runs (AUC 1.000). But look at how small the numbers are. That's the finding, and it has a section of its own below.
 
-### Synthetic kinematic pick-and-place
+Also notice that "interviewee degradation" scores higher than "agent repetition" even though the repetition is word-for-word identical. That's correct. Re-asking about *location* — already 78% resolved — is barely a stall, because there was little left to gain. Hammering *equipment* — stuck at 20% — is a real one. The monitor weights a stall by what's still at stake.
 
-`binding_kinematic.py` is a dependency-free continuous-control analogue with
-this task schema:
+---
 
-```text
-reach -> grasp -> lift -> place
-```
+### 2. Robot pick-and-place (physical task)
 
-It provides clean execution, orbit-stall, and saturated-hold trajectories and
-emits the same `ast-tau-v1` records as the dialogue substrate.
+A four-step task: reach → grasp → lift → place. Pure NumPy kinematics, no MuJoCo. Three runs:
 
-### BOIR intent estimator — AST over another inference process
-
-`binding_boir.py` is the substrate that makes the substrate-agnosticism claim
-non-trivial. The monitored plant is not a task. It is a **recursive Bayesian
-estimator** inferring which of four goals an operator intends, from angle and
-path-length observations. AST asks a question about the *estimator*:
-
-> Is incoming evidence still resolving intent, or is the estimator processing
-> recurrent evidence without epistemic progress?
-
-```text
-M : goal hypotheses {h_1..h_4}; dimension i = "hypothesis i adjudicated",
-    by confirmation OR elimination -- ruling a goal out is acquisition
-Y : a window of K=5 estimator ticks (posterior dynamics + the observations
-    driving them)
-S : decisiveness, s_i = 1 - H_b(p_i)  -- deployable, needs no ground truth
-e : 22-d inference-dynamics signature (posterior mean/delta, angle and path
-    evidence, entropy level and trend, KL innovation, MAP-switch count)
-```
-
-Everything is generated in closed form from a seed. No robot, no simulator, no
-logs, no data directory.
-
-```bash
-python exp_boir_evaluation.py
-```
-
-| scenario | mean SI | completeness | MAP correct |
+| run | what happens | mean SI | at θ=0.20 |
 |---|---|---|---|
-| clean convergence | 0.078 | 0.948 | 10/12 |
-| **ambiguous recurrence** | **0.463** | 0.621 | 5/12 |
-| intent switch (epoch 1 / 2) | 0.056 / 0.060 | 0.932 / 0.937 | 8/8, 7/8 |
-| confidently wrong | 0.077 | 0.935 | **0/12** |
+| clean | the arm completes the task | 0.051 | — |
+| **orbit stall** | the arm circles the object without ever grasping it | **0.399** | recall 0.94, precision 1.00 |
+| **saturated hold** | the arm finishes, then hovers at the goal doing nothing | 0.040 | no alarm |
 
-Pooled AUC **1.000**, perfect rank separation.
+**What this means.** Compare the last two rows. **Both are "the robot is doing nothing new."** Both would trip a naive repetition detector. The monitor fires on one and stays silent on the other — because in the orbit the task is *unfinished*, and in the hold it's *done*.
 
-**Epochs.** Within an epoch the latent goal is fixed, so evidence accumulation
-about it is legitimately monotone. Across an intent change it is not. So BOIR runs
-*continuously* across the boundary — its carry-over and lag are the phenomenon —
-while AST *resets*, as one session per epoch. This needs no change to the shared
-runner.
+That's the whole reason SI is multiplied by `(1 − completeness)`. An idle robot that has finished its job is not stalled. `saturated_hold` is the single most important control in this repository: it's the one that proves SI is measuring **stalling**, not merely **repetition**.
 
-**Multi-dimension gain.** A single posterior update can confirm one hypothesis
-while eliminating another, so several schema dimensions gain in one exchange. The
-aggregate-gain dampening declared in the manifest is not an optimisation here; it
-is a correctness requirement, and it was already in place.
+Here the fixed threshold works: θ anywhere from 0.20 to 0.40 gives precision 1.00 and zero false positives.
 
-## Two findings from the BOIR substrate
+---
 
-Both are boundary conditions, and both are stated here because a reviewer would
-otherwise find them.
+### 3. Bayesian intent estimator (another inference process)
 
-### 1. The scorer must be non-monotone in the monitored state
+This one isn't a task at all. A recursive Bayesian estimator watches an operator move and infers which of four goals they're heading for. AST watches **the estimator**: is evidence still resolving intent, or is the estimator spinning?
 
-AST integrates with a running maximum, `upsilon_i(t) = max(upsilon_i(t-1),
-s_i(t))`. A posterior can **un-resolve**. Whether the two are compatible depends
-entirely on the *shape* of the scorer. Measured on `ambiguous_recurrence`, on the
-two contested hypotheses:
+| run | what happens | mean SI | estimator right? |
+|---|---|---|---|
+| clean convergence | evidence steadily favours one goal | 0.078 | 10/12 ✓ |
+| **ambiguous recurrence** | two goals stay equally plausible forever | **0.463** | 5/12 |
+| intent switch | the operator changes their mind halfway | 0.056 / 0.060 | 8/8, 7/8 ✓ |
+| **confidently wrong** | evidence cleanly favours the **wrong** goal | 0.077 | **0/12** ✗ |
 
-| scorer | monotone in p? | final `upsilon` | saturation weight `(1 - upsilon)` | pooled AUC |
-|---|---|---|---|---|
-| decisiveness `1 - H_b(p)` | **no** | 0.367 / 0.310 | **0.661** | **1.000** |
-| veridical `p` / `1 - p` | yes | 0.745 / 0.774 | 0.241 | 0.854 |
+Pooled AUC **1.000**, with real margin: the quietest stall (0.191) still beats the loudest clean exchange (0.140).
 
-Decisiveness collapses to zero at `p = 0.5` — exactly where a contested hypothesis
-lives — so churn cannot ratchet the running maximum, the saturation weight stays
-high, and SI keeps firing. Veridical resolvedness is monotone in `p`, so a
-transient swing is **locked in** by the maximum: `upsilon` records a peak the
-estimator never sustained, and SI is suppressed ~2.6x in the very scenario built to
-produce a stall.
+**What this means — and read the last row twice.**
 
-So the deployable scorer is the default, and truth enters as a ground-truth
-**annotation** (`p_true`, `map_correct`) rather than as a scorer input.
-`--scorer veridical` remains available as a diagnostic and prints a warning.
+In `confidently_wrong`, the estimator resolves the question cleanly and confidently. Completeness reaches **0.935**. SI stays at **0.077** — no friction, no alarm. And the estimator is **wrong in every single window**.
 
-Generalised: **monotone integration is appropriate where acquisition is
-irreversible. A process that can lose ground needs a scorer bounded away from 1
-while its state is contested.** That is a real constraint on where AST applies, and
-it is not visible in a substrate where progress cannot be undone.
+SI is *right* to be quiet. The estimator isn't stuck. It's confident and mistaken, and those are different failures.
 
-### 2. A truth-free friction channel cannot certify correctness
+> **AST tells you whether a process is still learning. It cannot tell you whether what it learned is true.**
 
-In `confidently_wrong` the estimator adjudicates the hypothesis space to
-completeness **0.935** at mean SI **0.077** — no friction, no stall — and its MAP
-hypothesis is wrong in **12 of 12** windows.
+That's a hard limit, it's demonstrated here rather than hedged around, and no threshold tuning will move it.
 
-SI is *correct* to be low. The estimator is not stuck. It is confident and
-mistaken, and those are different failures.
+---
 
-> **AST can tell you whether an inference process is still learning. It cannot tell
-> you whether what it learned is true.**
+## Two findings you should know before trusting a number
 
-The veridical annotation sees it (`p(true) = 0.007`). The deployable channel cannot,
-and no amount of threshold tuning will change that.
+### SI's *ranking* is reliable. Its *scale* is not.
 
-## Set up the Qwen3 hiker experiment
+We scored the same three interview runs under two different embedding models:
 
-Install and start Ollama, then make the embedding model available locally:
+| embeddings | mean SI (stalls) | mean SI (clean) | AUC |
+|---|---|---|---|
+| hash vectors, 96-d | 0.217 | 0.008 | **1.000** |
+| qwen3, 4096-d | 0.174 | 0.008 | **1.000** |
 
-```bash
-ollama pull qwen3-embedding
-ollama serve
-```
+Stalls beat clean turns every time under both. But the absolute numbers move, because SI is normalised by how much the evidence "belongs" to each category — and different embedding spaces spread evidence differently.
 
-In another terminal:
+**So a stall threshold tuned on one representation does not transfer to another.** θ lives in `per_binding_calibration`, not in the shared block:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e '.[embeddings]'
-python precompute_embeddings.py
-python check_embedding_separation.py    # gate; see below
-python exp1_evaluation.py
-```
+- **robot** and **estimator** declare θ = 0.20 — their representations are fixed numeric vectors, and the sweep shows a wide safe plateau.
+- **the interview declares no threshold at all.** Its ranking is perfect, but 9-turn sessions can only measure a false-positive rate to the nearest 1/9. That's too coarse to set a threshold honestly, so we don't set one. We report AUC and mean separation, print the θ=0.20 numbers *including where they fail*, and **we did not retune θ to make them look better.**
 
-`check_embedding_separation.py` exists because transformer embedding spaces are
-anisotropic: cosine similarities bunch high rather than near zero, which lifts
-`SI^perp` on every exchange, including the efficient control. Hash vectors are
-near-orthogonal by construction and cannot reveal this. The script reports the
-cosine spread of the archive and whether the three regimes still separate. If
-they separate in mean but not against the fixed threshold, report mean-SI
-separation and drop the threshold table — do not retune the threshold.
+Every evaluation prints a threshold sweep so you can see where an operating point would sit without us having picked one for you.
 
-`precompute_embeddings.py` calls the local endpoint used by the research code:
+### The scorer has to be able to go back down
 
-```text
-http://localhost:11434/api/embeddings
-```
+AST records the *best* score each category has ever reached. That's fine when progress can't be undone — a fact learned, an object grasped. A Bayesian posterior can un-learn, and that breaks the assumption.
 
-It writes:
+Two ways to score the estimator, on the churning `ambiguous_recurrence` run:
 
-```text
-data/hiker_embeddings_qwen3.npz
-data/hiker_embeddings_qwen3.manifest.json
-```
+| scorer | recorded state | room left to stall | pooled AUC |
+|---|---|---|---|
+| **decisiveness** — how *settled* is this hypothesis | 0.37 | **0.66** | **1.000** |
+| veridical — how *close to the truth* is it | 0.75 | 0.24 | 0.854 |
 
-A different endpoint, model, or output location can be supplied explicitly:
+Decisiveness bottoms out when a hypothesis is a coin-flip, which is exactly where a contested hypothesis sits — so churn can't inflate it. Veridical resolvedness rises and falls with the posterior, so one lucky swing gets locked in as a permanent high-water mark, and the monitor concludes the question is settled when it isn't. SI drops 2.6× in the run built to produce a stall.
 
-```bash
-python precompute_embeddings.py \
-  --model qwen3-embedding \
-  --ollama-url http://localhost:11434/api/embeddings \
-  --output data/hiker_embeddings_qwen3.npz
-```
+So the default scorer is the truth-free one, and truth enters only as a ground-truth *label* for evaluation. Generalised:
 
-The archive itself is not included in this draft because it must be generated
-by a machine running Ollama. Once generated, it can be committed to the public
-repository if redistribution of those model outputs is acceptable for the
-project.
+> **AST assumes progress is permanent. If your process can lose ground, the scorer must be one that falls when the process does.**
 
-## Smoke tests without Ollama
+That's a real limit on where this applies, and you can't see it in a substrate where progress can't be undone. Which is why the estimator is in here.
 
-Hash vectors exist only to test the plumbing and CI:
-
-```bash
-python exp1_evaluation.py --hash-embeddings
-python -m unittest discover -s tests -v
-```
-
-Results from this mode must not be presented as the hiker experiment. The JSONL
-metadata records `embedding_backend: hash-smoke` so the two modes cannot be
-confused accidentally.
-
-## Kinematic example
-
-```bash
-python exp_kinematic_evaluation.py
-```
-
-## Shared trajectory contract
-
-Both substrates emit `ast-tau-v1.1` JSONL. Each exchange record carries:
-
-```text
-t                target exchange index
-i_t              target schema category
-upsilon          per-category completeness
-delta_upsilon    per-category gain this exchange
-PE / PE_total    Bayesian progress estimator
-SI               geometric stalling index
-eta              per-category orthogonal novelty  (phase-space: NOVELTY axis)
-rho              per-category geometric membership, = 1 - eta
-dampening        D(t) = max(eta_min, 1 - lambda * sum_i delta_upsilon_i)
-gt               constructed ground-truth annotations
-```
-
-`eta` against `delta_upsilon` is the novelty-versus-yield plane. The phase-space
-package should consume this contract only and should not import either substrate.
-
-### Dampening is aggregate, and declared
-
-`D(t)` uses the **aggregate** gain summed over all schema dimensions, not the
-target dimension's gain alone. The two coincide only when exactly one dimension
-gains per exchange; both substrates here violate that (a free-recall answer
-resolves several categories at once; the grasp frame resolves `grasp` and `lift`
-together). The mode is declared in `calibration_manifest.json` as
-`dampening_gain: aggregate_delta_upsilon`, asserted at runner construction, and
-pinned by `tests/test_frozen_core.py`.
-
-## Tests
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-Thirty tests, no network and no optional dependencies. They cover state
-monotonicity, telemetry bounds, binding-contract enforcement, ordinal regime
-separation on both substrates, and the identity of the two trajectory schemas.
-`tests/test_frozen_core.py` additionally pins `SI^perp` against
-`tests/reference_si.py`, the pre-refactor implementation vendored verbatim, so
-that exporting `eta`/`rho` provably did not move any number.
-
-## Finding: SI's ordering is universal, its scale is not
-
-This repository ships a result, not just a demo.
-
-The same three SAR trajectories were scored under two evidence representations —
-96-d hash vectors and 4096-d `qwen3-embedding`:
-
-| representation | median pairwise cosine | mean SI (stall) | mean SI (clean) | AUC |
-|---|---|---|---|---|
-| hash, 96-d | 0.012 | 0.217 | 0.008 | **1.000** |
-| qwen3, 4096-d | 0.459 | 0.174 | 0.008 | **1.000** |
-
-Rank separation is perfect under both: every stall exchange scores above every
-clean exchange. But the absolute scale moves, and it moves for a structural
-reason. SI is normalised:
-
-```text
-SI(t) = sum_i rho_i(t)^2 * D(t) * (1 - upsilon_i(t))  /  sum_i rho_i(t)
-```
-
-Hash vectors are near-orthogonal by construction, so a stall's evidence has
-membership `rho ~ 0` on every non-target dimension and the denominator stays
-small. A real embedding space is not orthogonal: `rho` is non-trivial on other
-dimensions too, the denominator grows, and SI compresses — without the numerator
-or the ordering changing.
-
-The consequence is a calibration rule, not a caveat:
-
-> **`SI^perp`'s ordering is a property of the monitor. Its absolute scale is a
-> property of the evidence representation. A stall threshold fitted under one
-> embedding map does not transfer to another.**
-
-So `theta` is **not** in the shared calibration block. It lives in
-`per_binding_calibration`, and:
-
-- the **kinematic** binding declares `theta = 0.20` — its representation is the
-  declared numeric state vector, its SI scale is stable, and the pooled sweep
-  shows a wide plateau (`theta` in 0.20–0.40 gives precision 1.00, FPR 0.00);
-- the **SAR** binding declares **no threshold at all**. AUC is 1.000 on both
-  stall regimes, but 9-exchange sessions resolve false-positive rate only to 1/9,
-  which is too coarse to fit `theta` honestly. It reports AUC and mean-SI
-  separation, and prints the `theta = 0.20` operating point anyway — including
-  the places it fails — so the failure is visible rather than hidden.
-
-Both evaluations print a pooled threshold sweep so a reader can see where an
-operating point would sit without the author having chosen one. **The threshold
-was not retuned to rescue the linguistic result.**
+---
 
 ## Reading the figures
 
-Every evaluation writes four kinds of figure. They follow rules that exist
-because the obvious version of each is misleading:
+Every evaluation writes four. Each follows a rule that exists because the obvious version misleads.
 
-- **Per-condition time series** — conditions from the same substrate share axis
-  limits and a shaded `theta` band. Per-condition autoscaling makes an efficient
-  control's SI noise look like a stall.
-- **Global AST telemetry trajectory** (`*_telemetry_trajectory.png`) —
-  completeness x PE x SI, with a translucent `SI = theta` plane. Time is encoded
-  by colour, arrows and step labels, and marker area grows with consecutive
-  no-gain occupancy, so dwell is visible. Deliberately *not* called a phase
-  portrait: the axes are telemetry channels, not a state and its derivative.
-- **Regime portrait** (`regime_portrait.png`) — mean gain x SI x PE. This is the
-  view that discriminates. A saturated hold and an unresolved stall both sit at
-  zero gain and are separated *only* by SI and PE together, which is the case for
-  reporting both channels rather than either alone.
-- **Evidence geometry** (`evidence_geometry.png`) — one PCA basis fitted on the
-  union of all conditions, with all panels sharing that basis *and* one viewport;
-  separately fitted projections are not comparable. Recurrence links are computed
-  by cosine in the **full** embedding space and only drawn in the projection, and
-  candidates within 3 exchanges are excluded, because adjacency is not
-  recurrence: a smooth trajectory has cosine > 0.99 with the frame it just left.
-  In the kinematic substrate the clean and saturated runs traverse the space
-  while the orbit stall never leaves one region.
+**Time series** (`<run>.png`) — all runs from one substrate share the same axes, with the θ band shaded. Autoscaling each run separately makes a clean run's noise look like a stall.
 
-Link *counts* in the evidence-geometry view are themselves
-representation-dependent, for the same reason SI's scale is — read the spatial
-extent, not the tally.
+**Telemetry trajectory** (`*_telemetry_trajectory.png`) — completeness × PE × SI in 3-D, with the θ plane drawn in. Colour is time; **dots get bigger the longer a run goes without gaining anything**. A stall looks like a pile-up.
 
-## Repository map
+**Regime portrait** (`regime_portrait.png`) — gain × SI × PE. This is the one that discriminates:
+
+| | gain | SI | PE |
+|---|---|---|---|
+| productive | > 0 | low | varies |
+| **unresolved stall** | ≈ 0 | **high** | **high** |
+| **saturated hold** | ≈ 0 | **low** | **low** |
+
+A stall and a finished-and-idle process both sit at zero gain. **Only SI and PE together tell them apart** — which is why you need both channels, and why they're plotted against each other.
+
+**Evidence geometry** (`evidence_geometry.png`) — where the evidence actually went. One PCA basis fitted across all runs, one shared viewport, so positions are comparable. Red lines mark a return to somewhere you'd already been (computed in the full space, drawn in 2-D; steps within 3 exchanges are excluded, because moving smoothly isn't the same as going back).
+
+In the robot figure: the clean and hold runs sweep across the whole space. **The orbit stall never leaves its corner.** That's the picture of the thing.
+
+*(Check the variance number in the caption. At 93% — the robot — you can trust fine positions. At 56% — the estimator — read the spread, not the detail. The plot says so itself.)*
+
+---
+
+## What's honest about this repo
+
+- Synthetic **task data**, not synthetic embeddings. The interview uses a real embedding model.
+- The core equations are unchanged from the research code, and a test replays every exchange against the original implementation to prove it.
+- Constructed stalls are labelled *by scenario design*, never by a rule derived from the monitor's own output.
+- A within-run AUC is suppressed when its only clean exchanges are warm-up exchanges — that number would be 1.000 for free, so we don't print it.
+- Where the method fails, it says so: no threshold for the interview, no correctness guarantee for the estimator.
+- The optional PPO example is an integration pattern, **not** a performance claim.
+
+## Layout
 
 ```text
-telemetry_tools_geometric.py    shared PE/SI equations
-calibration_manifest.json       shared monitor settings
-substrate_binding.py            B=(M,Y,S,e), runner, JSONL contract
-corpus_hiker.py                 synthetic linguistic binding
-binding_kinematic.py            synthetic continuous-control binding
-bayesian_intent.py              recursive Bayesian intent estimator (BOIR)
-synthetic_intent_trajectories.py deterministic angle/path streams, 4 scenarios
-binding_boir.py                 AST-over-estimator binding
-exp1_evaluation.py              qwen3 hiker evaluation (threshold-free headline)
-exp_kinematic_evaluation.py     kinematic evaluation
-exp_boir_evaluation.py          BOIR estimator evaluation
-precompute_embeddings.py        Ollama qwen3-embedding precomputation
-check_embedding_separation.py   gate: does qwen3 preserve regime separation?
-evaluation_utils.py             detector metrics
-plotting.py                     static plots
-visualisation.py                substrate-independent telemetry-trajectory renderer
-examples/run_both_substrates.py one trajectory from each substrate
-optional/ppo_ast_demo.py        optional control integration
-tests/                          54 tests; no network, no Ollama, no MuJoCo
+telemetry_tools_geometric.py     the PE and SI equations — shared, unchanged
+substrate_binding.py             B = (M, Y, S, e), the runner, the JSONL contract
+calibration_manifest.json        every constant, in one place
+
+corpus_hiker.py                  substrate 1: interview
+binding_kinematic.py             substrate 2: robot arm
+bayesian_intent.py               substrate 3: the estimator being watched
+synthetic_intent_trajectories.py     its four scenarios, generated from a seed
+binding_boir.py                      and its binding
+
+exp1_evaluation.py               run substrate 1   (add --hash-embeddings for no-Ollama)
+exp_kinematic_evaluation.py      run substrate 2
+exp_boir_evaluation.py           run substrate 3
+
+plotting.py / visualisation.py   figures; the viewer reads any substrate's JSONL
+tests/                           54 tests — no network, no Ollama, no MuJoCo
+optional/ppo_ast_demo.py         wiring AST into an RL loop
 ```
+
+## Running the interview experiment with real embeddings
+
+```bash
+ollama pull qwen3-embedding && ollama serve
+python precompute_embeddings.py
+python check_embedding_separation.py   # confirms the regimes still separate
+python exp1_evaluation.py
+```
+
+Without Ollama, `--hash-embeddings` runs the same pipeline on deterministic hash vectors. It's a plumbing check, not the experiment, and the output says so on every line.
 
 ## Scope
 
-- Synthetic refers to the task data and constructed regimes, not to the default linguistic embedding model.
-- Ground-truth stalls are constructed by design.
-- `SI^perp` is a low-yield recurrence measurement under the declared binding, not a causal diagnosis.
-- `PE^B` and `SI^perp` are telemetry. Alert, reward, truncation, or intervention policies are downstream choices.
-- The optional PPO example is an integration pattern, not a performance claim.
+- SI measures **low-yield recurrence under a declared binding**. It is not a diagnosis of *why*.
+- PE and SI are **telemetry**. What you do with them — alert, penalise, truncate, intervene — is a separate decision.
+- The full empirical study is under review. This repository is the method, on synthetic data.
 
-## License
-
-Code and synthetic task data are released under the MIT License.
+MIT licensed.

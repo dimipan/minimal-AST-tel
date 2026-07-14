@@ -436,10 +436,19 @@ def plot_evidence_geometry(
         ax.set_ylim(*ylim)
         ax.set_aspect("equal", adjustable="box")
 
+    caveat = (
+        ""
+        if explained >= 0.70
+        else (
+            "  LOW VARIANCE: nearly half the structure is off-screen — "
+            "read the spatial EXTENT, not the fine positions.\n"
+        )
+    )
     fig.suptitle(
         f"Evidence geometry — {title}\n"
         f"one shared PCA basis fitted on the union of all conditions; "
         f"2 components explain {explained:.1%} of variance; all panels share one basis and one viewport.\n"
+        f"{caveat}"
         f"Red links: cosine >= {recurrence_cosine:.2f} to an exchange at least {min_lag} steps earlier "
         f"(adjacency is not recurrence), computed in the full space, drawn in the projection.",
         fontsize=9,

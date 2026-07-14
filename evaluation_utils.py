@@ -98,11 +98,26 @@ def separation_metrics(records: list[Mapping[str, Any]]) -> dict[str, Any]:
     stall = [s for s, y in zip(scores, labels) if y]
     clean = [s for s, y in zip(scores, labels) if not y]
 
+    # A within-condition AUC is VACUOUS when every negative exchange is a
+    # structural zero. SI is identically 0 on the first exchange of any session
+    # (no prior subspace exists to be recurrent against), so a condition whose
+    # only clean exchanges are warm-up exchanges scores AUC 1.000 for free. That
+    # is not a result, and reporting it would invite someone to quote it.
+    # Pool across conditions instead: real negatives, real margin.
+    vacuous = bool(stall) and bool(clean) and all(score == 0.0 for score in clean)
+    auc = None if vacuous else binary_auc(stall, clean)
+
     return {
         "n_exchanges": len(records),
         "n_stall": sum(labels),
-        "auc": binary_auc(stall, clean),
-        "cliffs_delta": cliffs_delta(stall, clean),
+        "auc": auc,
+        "auc_vacuous": vacuous,
+        "auc_note": (
+            "not reported: every clean exchange in this condition is a warm-up "
+            "exchange with SI = 0 by construction; see the pooled row"
+            if vacuous else None
+        ),
+        "cliffs_delta": None if vacuous else cliffs_delta(stall, clean),
         "mean_si_stall": sum(stall) / len(stall) if stall else None,
         "mean_si_clean": sum(clean) / len(clean) if clean else None,
         "si_separation": (
@@ -112,7 +127,7 @@ def separation_metrics(records: list[Mapping[str, Any]]) -> dict[str, Any]:
         "max_si_clean": max(clean) if clean else None,
         "min_si_stall": min(stall) if stall else None,
         "perfect_rank_separation": (
-            bool(min(stall) > max(clean)) if stall and clean else None
+            None if vacuous else (bool(min(stall) > max(clean)) if stall and clean else None)
         ),
         "final_knowledge_mean": float(records[-1]["knowledge_mean"]) if records else math.nan,
         "final_pe_total": float(records[-1]["pe_total"]) if records else math.nan,
