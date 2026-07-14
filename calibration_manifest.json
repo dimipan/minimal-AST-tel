@@ -1,0 +1,52 @@
+{
+  "manifest_version": "ast-public-shared-v1.3",
+  "provenance": "Shared monitor settings carried from the supplied AST research code. The public examples do not retune these values per substrate.",
+  "pe_bayesian": {
+    "alpha": 0.5,
+    "beta_epistemic_bonus": 0.5,
+    "prior": "Beta(1,1)",
+    "gain_threshold_upsilon_star": 0.5
+  },
+  "si_geometric_subspace": {
+    "lambda_damp": 5.0,
+    "eta_min": 0.2,
+    "membership_threshold": 0.0,
+    "window": null,
+    "dampening_gain": "aggregate_delta_upsilon",
+    "dampening_note": "D(t) = max(eta_min, 1 - lambda_damp * sum_i delta_upsilon_i(t)). The gain term is the AGGREGATE gain across all schema dimensions in the exchange, not the target dimension's gain alone. The two coincide when exactly one dimension gains per exchange; they differ here, because both included substrates produce multi-dimension gains (free-recall answers, and the grasp frame that resolves grasp and lift together). TelemetryRunner asserts this mode at construction."
+  },
+  "state_integration": {
+    "rule": "running_maximum",
+    "success_threshold": 0.01
+  },
+  "substrate_inputs_declared_open": {
+    "scorer_S": "architectural input per Eq. (1) of tier-1 paper",
+    "embedding_map_e": "architectural input; enters via HybridKnowledgeState embedding source; all downstream geometry frozen"
+  },
+  "shared_monitor_note": "pe_bayesian, si_geometric_subspace and state_integration are held constant across every substrate in this repository. The stall-declaration threshold is NOT among them; see per_binding_calibration.",
+  "per_binding_calibration": {
+    "note": "SI^perp's ORDERING is a property of the monitor; its ABSOLUTE SCALE is a property of the evidence representation. The denominator sum_i rho_i grows when the representation places non-trivial membership mass on non-target dimensions, which compresses SI without weakening rank separation. A threshold fitted under one embedding map therefore does not transfer to another. Measured here: identical stall exchanges score mean SI 0.217 under 96-d hash vectors and 0.174 under 4096-d qwen3-embedding, while AUC stays at 1.000 in both. Fit theta on CONTROL sessions only, never on stall data, and only when the control set is large enough to resolve the target false-positive rate.",
+    "synthetic-kinematic-pick-place": {
+      "offline_detection_threshold": 0.2,
+      "status": "usable",
+      "evidence": "declared numeric state representation; clean control max SI 0.158, orbit stall mean 0.510; AUC 0.972"
+    },
+    "synthetic-sar-hiker-qwen3": {
+      "offline_detection_threshold": null,
+      "status": "not fitted",
+      "evidence": "AUC 1.000 on both stall regimes (perfect rank separation), but no threshold is reported: 9-exchange sessions resolve false-positive rate only to 1/9, which is too coarse to fit theta honestly. Report AUC and mean-SI separation instead."
+    },
+    "rl_truncation_threshold_note": "0.20 used for offline stall-event detection (ensemble_scorer.py); 0.30 used for RL episode truncation (environment_config.py). Tier-2 uses the same role split.",
+    "synthetic-boir-intent-decisiveness": {
+      "offline_detection_threshold": 0.2,
+      "status": "usable",
+      "evidence": "pooled AUC 1.000 with perfect rank separation; mean SI 0.505 on the ambiguous-recurrence stall against 0.068 on the three controls",
+      "scorer_note": "AST integrates monotonically and a posterior can un-resolve, so the scorer must be NON-monotone in the estimator's state. Decisiveness s_i = 1 - H_b(p_i) collapses at p = 0.5, which is where a contested hypothesis lives, so churn cannot ratchet the running maximum. This is a requirement, not a preference."
+    },
+    "synthetic-boir-intent-veridical": {
+      "offline_detection_threshold": null,
+      "status": "diagnostic only -- do not report as headline",
+      "evidence": "pooled AUC 0.854, rank separation NOT perfect. Veridical resolvedness is monotone in p, so a transient posterior swing is locked in by the running maximum: on the contested hypotheses the saturation weight (1 - upsilon) falls from 0.661 to 0.241, suppressing SI ~2.6x in the scenario designed to produce a stall. Truth belongs in the ground-truth annotation, not the scorer."
+    }
+  }
+}

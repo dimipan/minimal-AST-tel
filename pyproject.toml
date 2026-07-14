@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ast-telemetry"
+version = "0.1.0"
+description = "Acquisition-State Telemetry: a substrate-agnostic monitor for information-acquisition processes (public synthetic demonstration)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+# Only needed to REGENERATE the qwen3 embedding archive from a local Ollama server.
+embeddings = ["requests>=2.31"]
+# Only needed for the optional PPO integration example.
+rl = ["gymnasium>=0.29", "stable-baselines3>=2.2"]
+dev = ["requests>=2.31"]
+
+[tool.setuptools]
+py-modules = [
+    "telemetry_tools_geometric",
+    "substrate_binding",
+    "corpus_hiker",
+    "binding_kinematic",
+    "bayesian_intent",
+    "synthetic_intent_trajectories",
+    "binding_boir",
+    "evaluation_utils",
+    "plotting",
+    "visualisation",
+]
+
+[tool.setuptools.package-data]
+"*" = ["calibration_manifest.json"]
