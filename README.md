@@ -169,6 +169,110 @@ In the robot figure: the clean and hold runs sweep across the whole space. **The
 
 ---
 
+## The phase space
+
+The three substrates all write the same trajectory format, and `phase_space.py`
+reads *only* that format — no substrate, no binding, no monitor. Give it any
+trajectory and it places every exchange in a regime:
+
+```bash
+python phase_space_report.py outputs/boir/*.jsonl
+python phase_space_report.py outputs/kinematic/*.jsonl   # same layer, no changes
+```
+
+Three telemetry quantities name the regime: **yield** (did this exchange resolve
+anything), **friction** (SI — is evidence recurring for nothing), **pressure** (PE
+— how much is still open).
+
+| regime | yield | friction | pressure | |
+|---|---|---|---|---|
+| productive | > 0 | — | — | resolving normally |
+| **churn** | ≈ 0 | **high** | **high** | the pathological stall |
+| converged | ≈ 0 | low | low | done; nothing left to do |
+| quiet-incomplete | ≈ 0 | low | high | starved, not spinning |
+
+**Why this needs both channels.** `churn` and `converged` are *both* zero-yield —
+a repetition detector cannot tell them apart. Only friction and pressure *together*
+separate "stuck with work remaining" from "finished and idle." That is the entire
+reason AST reports two channels, and the phase space is where it becomes a picture.
+
+**It transfers across substrates with no tuning.** The pathology verdict is the
+*churn fraction* — the share of exchanges in the zero-yield/high-friction corner —
+which is a pure count and needs no per-substrate calibration:
+
+| trajectory | churn fraction | verdict |
+|---|---|---|
+| BOIR ambiguous recurrence | 0.83 | **pathological** |
+| kinematic orbit stall | 0.71 | **pathological** |
+| BOIR clean / switch / confidently-wrong | 0.00 | healthy |
+| kinematic clean | 0.00 | healthy |
+| **kinematic saturated hold** | **0.00** | **healthy** |
+
+That last row is the test. The robot that finishes and idles is zero-yield forever,
+but it lands in `converged`, not `churn` — because its friction is low and its
+pressure is drained. The plane gets it right, on a substrate the plane was never
+tuned for.
+
+The portrait (`phase_portrait.png`) draws all of this: each exchange a point,
+coloured by regime, with the SI threshold as a plane. A stall floats above it at
+zero yield; a healthy run stays in the productive band below.
+
+For a finer decomposition of the recurrence axis, see the latent-absorption view
+below, which splits "non-progress" into its distinct geometric kinds.
+
+### The latent-absorption view (novelty x yield)
+
+`phase_space.py` collapses recurrence into one SI axis. `latent_absorption.py`
+opens it back up. SI is built from two things -- orthogonal novelty and yield --
+and both are already exported per exchange (`eta` and `gain`). Plot them against
+each other and you get four quadrants, a finer question than "is this a stall?":
+*what kind* of non-progress is this?
+
+```bash
+python latent_absorption_report.py outputs/boir/*.jsonl
+python latent_absorption_report.py outputs/kinematic/*.jsonl   # same view, no changes
+```
+
+|  | high yield | low yield |
+|---|---|---|
+| **high novelty** | productive expansion (new ground, it pays) | unproductive expansion (new ground, wasted -- drift) |
+| **low novelty** | useful recurrence (revisiting, still pays) | **latent absorption** (revisiting, exhausted -- stuck) |
+
+Latent absorption is the same corner `phase_space.py` calls churn: low-yield
+recurrence, the thing SI is built to catch. But the quadrant plane separates two
+failures the SI scalar merges -- **absorption** (stuck in ground already covered)
+versus **unproductive expansion** (wandering into novel but worthless territory).
+An intervention for one is wrong for the other, so naming them apart is the point.
+
+The verdict is the *latent-absorption fraction*, a scale-free count that transfers
+across substrates unchanged: 0.83 for the BOIR stall, 0.75 for the kinematic orbit
+stall, 0.00 for the healthy BOIR runs. Those healthy runs land in **useful
+recurrence** -- BOIR keeps refining the same posteriors and keeps gaining, which is
+exactly right.
+
+**The plane needs both axes, and there's a control that proves it.** Take two runs
+with the *same* low-novelty geometry but *different* yield: the healthy run's
+low-novelty exchanges (ON~0.35, Y~1.0) and the stall's (ON~0.20, Y~0.0). Same
+geometry, and yield alone flips them from useful recurrence to latent absorption.
+If it didn't, the classifier would be reading one axis and ignoring the other. This
+is the paired-decoy check, ported from the original latent-absorption benchmark but
+driven by real AST trajectories rather than synthetic sequences.
+
+**One honest limit, and it is why the two views are separate.** The absorption
+quadrant is purely geometric -- low novelty, low yield. A robot that *finishes* and
+then idles also shows low novelty and low yield, so absorption alone flags it
+(kinematic `saturated_hold`). It is not stuck; it is done. Only residual pressure
+(PE) tells those apart, which is exactly what `phase_space.py` adds: it correctly
+calls the finished hold *converged*, not churn. Read the two views together --
+latent-absorption names the kind of non-progress, phase-space says whether the
+schema is still open.
+
+*(This quadrant partition is also the natural place to state later guarantees:
+membership is a set defined on two telemetry primitives, so properties like "a
+trajectory that enters latent absorption and stays N steps satisfies X" or "an
+intervention that raises novelty must cross the absorption/expansion boundary" are
+statable against it -- which they are not against a scalar.)*
+
 ## What's honest about this repo
 
 - Synthetic **task data**, not synthetic embeddings. The interview uses a real embedding model.
@@ -195,6 +299,10 @@ exp1_evaluation.py               run substrate 1   (add --hash-embeddings for no
 exp_kinematic_evaluation.py      run substrate 2
 exp_boir_evaluation.py           run substrate 3
 
+phase_space.py                   regime classifier over the trajectory contract
+phase_space_report.py            phase portrait from any substrate's trajectories
+latent_absorption.py             novelty x yield quadrant decomposition
+latent_absorption_report.py      quadrant plane + paired-decoy validation
 plotting.py / visualisation.py   figures; the viewer reads any substrate's JSONL
 tests/                           54 tests — no network, no Ollama, no MuJoCo
 optional/ppo_ast_demo.py         wiring AST into an RL loop

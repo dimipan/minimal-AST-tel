@@ -30,6 +30,8 @@ py-modules = [
     "bayesian_intent",
     "synthetic_intent_trajectories",
     "binding_boir",
+    "phase_space",
+    "latent_absorption",
     "evaluation_utils",
     "plotting",
     "visualisation",

@@ -1,6 +1,0 @@
-condition,n_exchanges,n_stall,auc,auc_vacuous,auc_note,cliffs_delta,mean_si_stall,mean_si_clean,si_separation,max_si_clean,min_si_stall,perfect_rank_separation,final_knowledge_mean,final_pe_total
-clean_convergence,12,0,,False,,,,0.07768761592861337,,0.13960440291146903,,,0.9482080752110744,0.4612193170611839
-ambiguous_recurrence,12,11,,True,not reported: every clean exchange in this condition is a warm-up exchange with SI = 0 by construction; see the pooled row,,0.504945367055462,0.0,0.504945367055462,0.0,0.19074060654811484,,0.6209532208734262,0.8500894641264032
-intent_switch/e0,8,0,,False,,,,0.0558475813700695,,0.09076303138633791,,,0.93246346692108,0.554508299178702
-intent_switch/e1,8,0,,False,,,,0.05967148709099984,,0.09784911579015834,,,0.9365234982220672,0.5468512941402551
-confidently_wrong,12,0,,False,,,,0.07683222073305876,,0.13432222612710243,,,0.9353210635726761,0.5404893965250622

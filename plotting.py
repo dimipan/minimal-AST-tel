@@ -457,3 +457,158 @@ def plot_evidence_geometry(
     fig.savefig(output, dpi=160, bbox_inches="tight")
     plt.close(fig)
     return output, explained
+
+
+# ---------------------------------------------------------------------------
+# Phase-space portrait  (consumes phase_space.py output; no binding import)
+# ---------------------------------------------------------------------------
+def plot_phase_portrait(
+    labelled: "Mapping[str, Sequence]",
+    output_path: str | Path,
+    *,
+    title: str,
+    si_threshold: float = 0.20,
+) -> Path:
+    """Yield x pressure x friction, one trajectory per condition, coloured by regime.
+
+    `labelled` maps a condition name to its list of PhasePoint. This function does
+    not know what a substrate is; it reads phase points, which are pure telemetry.
+    The CHURN corner (low yield, high pressure, high friction) is the thing AST
+    exists to find; CONVERGED (low yield, low pressure, low friction) is its
+    innocent twin, and the plane is what separates them.
+    """
+    from phase_space import REGIME_COLOURS, REGIME_ORDER
+
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    fig = plt.figure(figsize=(15, 7.5))
+    grid = fig.add_gridspec(1, 2, width_ratios=[2.3, 1.0], wspace=0.02)
+    ax = fig.add_subplot(grid[0, 0], projection="3d")
+
+    markers = {"productive": "o", "churn": "X", "converged": "s", "quiet_incomplete": "^"}
+    for name, points in labelled.items():
+        xs = [p.yield_ for p in points]
+        ys = [p.pressure for p in points]
+        zs = [p.friction for p in points]
+        ax.plot(xs, ys, zs, color="0.7", lw=0.8, alpha=0.6, zorder=1)
+        for p in points:
+            ax.scatter(
+                p.yield_, p.pressure, p.friction,
+                color=REGIME_COLOURS[p.regime], marker=markers[p.regime],
+                s=48, edgecolors="0.2", linewidths=0.4, depthshade=False, zorder=3,
+            )
+        ax.text(points[-1].yield_, points[-1].pressure, points[-1].friction,
+                f" {name.split('/')[-1]}", fontsize=7, color="0.3")
+
+    # SI = threshold plane: the churn/quiet boundary on the friction axis.
+    y_lim = ax.get_xlim()
+    p_lim = ax.get_ylim()
+    gx, gy = np.meshgrid(np.linspace(*y_lim, 2), np.linspace(*p_lim, 2))
+    ax.plot_surface(gx, gy, np.full_like(gx, si_threshold),
+                    alpha=0.10, color="crimson", linewidth=0, shade=False)
+
+    ax.set_xlabel("yield  (gain per exchange)", labelpad=8)
+    ax.set_ylabel("pressure  ($PE^{B}$)", labelpad=8)
+    ax.set_zlabel("friction  ($SI^{\\perp}$)", labelpad=6)
+    ax.view_init(elev=22, azim=-60)
+    ax.set_title("AST phase portrait", fontsize=12, pad=2)
+
+    side = fig.add_subplot(grid[0, 1])
+    side.set_xlim(0, 1)
+    side.set_ylim(0, 1)
+    side.axis("off")
+    side.text(0.0, 0.98, title, fontsize=11, va="top", weight="bold")
+    side.text(0.0, 0.89,
+              "Each point is one exchange, coloured by regime.\n"
+              "The trajectory shape -- not any single point --\n"
+              "separates a stall from a healthy run.",
+              fontsize=9, va="top")
+    labels_desc = [
+        ("productive", "yield > 0: resolving normally"),
+        ("churn", "no yield, high friction, high pressure:\nthe pathological stall corner"),
+        ("quiet_incomplete", "no yield, low friction, high pressure:\nstarved, not spinning"),
+        ("converged", "no yield, low friction, low pressure:\ndone; nothing left to do"),
+    ]
+    y = 0.70
+    for regime, desc in labels_desc:
+        side.scatter([0.03], [y], color=REGIME_COLOURS[regime], marker=markers[regime],
+                     s=70, edgecolors="0.2")
+        side.text(0.10, y, regime, fontsize=9.5, va="center", weight="bold")
+        side.text(0.10, y - 0.045, desc, fontsize=8, va="top")
+        y -= 0.155
+    side.text(0.0, 0.03,
+              "churn and converged are BOTH zero-yield.\n"
+              "Only friction + pressure together tell them apart.",
+              fontsize=8.5, va="bottom", style="italic")
+
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.94, bottom=0.06)
+    fig.savefig(output, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
+# ---------------------------------------------------------------------------
+# Latent-absorption quadrant plane (consumes latent_absorption.py; no binding)
+# ---------------------------------------------------------------------------
+def plot_absorption_plane(
+    labelled: "Mapping[str, Sequence]",
+    output_path: str | Path,
+    *,
+    title: str,
+) -> Path:
+    """The novelty x yield quadrant scatter.
+
+    x = orthogonal novelty (ON), y = normalised yield (Y). Four quadrants:
+    productive expansion (top-right), useful recurrence (top-left), unproductive
+    expansion (bottom-right), latent absorption (bottom-left). `labelled` maps a
+    condition name to its list of AbsorptionPoint. No binding is imported.
+    """
+    from latent_absorption import QUADRANT_COLOURS
+
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(9, 8))
+
+    # Quadrant backdrop
+    ax.axhline(0.5, color="0.6", lw=1.0, ls="--", zorder=1)
+    ax.axvline(0.5, color="0.6", lw=1.0, ls="--", zorder=1)
+    ax.add_patch(plt.Rectangle((0.5, 0.5), 0.5, 0.5, color="#1f77b4", alpha=0.06, zorder=0))
+    ax.add_patch(plt.Rectangle((0.0, 0.5), 0.5, 0.5, color="#2ca02c", alpha=0.06, zorder=0))
+    ax.add_patch(plt.Rectangle((0.5, 0.0), 0.5, 0.5, color="#ff7f0e", alpha=0.06, zorder=0))
+    ax.add_patch(plt.Rectangle((0.0, 0.0), 0.5, 0.5, color="#d62728", alpha=0.08, zorder=0))
+    ax.text(0.75, 0.96, "PRODUCTIVE\nEXPANSION", ha="center", va="top", fontsize=9,
+            color="#1f77b4", weight="bold")
+    ax.text(0.25, 0.96, "USEFUL\nRECURRENCE", ha="center", va="top", fontsize=9,
+            color="#2ca02c", weight="bold")
+    ax.text(0.75, 0.12, "UNPRODUCTIVE\nEXPANSION", ha="center", va="bottom", fontsize=9,
+            color="#ff7f0e", weight="bold")
+    ax.text(0.25, 0.12, "LATENT\nABSORPTION", ha="center", va="bottom", fontsize=9,
+            color="#d62728", weight="bold")
+
+    markers = ["o", "^", "s", "D", "v", "P"]
+    for index, (name, points) in enumerate(labelled.items()):
+        xs = [p.on for p in points]
+        ys = [p.y for p in points]
+        colours = [QUADRANT_COLOURS[p.quadrant] for p in points]
+        ax.plot(xs, ys, color="0.75", lw=0.7, alpha=0.5, zorder=2)
+        ax.scatter(xs, ys, c=colours, marker=markers[index % len(markers)],
+                   s=55, edgecolors="0.2", linewidths=0.5, zorder=3, label=name)
+        ax.scatter([xs[-1]], [ys[-1]], facecolors="none", edgecolors="black",
+                   s=150, linewidths=1.4, zorder=4)
+
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
+    ax.set_xlabel("orthogonal novelty  ON  (mean $\\eta$)")
+    ax.set_ylabel("yield  Y  (normalised gain)")
+    ax.set_title(title, fontsize=11)
+    ax.legend(fontsize=8, loc="center right", framealpha=0.9)
+    ax.text(0.5, -0.09,
+            "circled = final exchange.  Same low-ON geometry, different Y, "
+            "flips useful-recurrence <-> latent-absorption:\nthe plane needs both axes.",
+            ha="center", va="top", fontsize=8, transform=ax.transAxes, style="italic")
+    fig.tight_layout()
+    fig.savefig(output, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return output
