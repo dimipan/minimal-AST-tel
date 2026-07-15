@@ -1,0 +1,35 @@
+{
+  "clean": {
+    "quadrant_counts": {
+      "productive_expansion": 2,
+      "useful_recurrence": 20,
+      "unproductive_expansion": 1,
+      "latent_absorption": 0
+    },
+    "latent_absorption_fraction": 0.0,
+    "terminal_quadrant": "unproductive_expansion",
+    "absorbed": false
+  },
+  "orbit_stall": {
+    "quadrant_counts": {
+      "productive_expansion": 1,
+      "useful_recurrence": 5,
+      "unproductive_expansion": 0,
+      "latent_absorption": 18
+    },
+    "latent_absorption_fraction": 0.75,
+    "terminal_quadrant": "latent_absorption",
+    "absorbed": true
+  },
+  "saturated_hold": {
+    "quadrant_counts": {
+      "productive_expansion": 2,
+      "useful_recurrence": 20,
+      "unproductive_expansion": 1,
+      "latent_absorption": 8
+    },
+    "latent_absorption_fraction": 0.25806451612903225,
+    "terminal_quadrant": "latent_absorption",
+    "absorbed": true
+  }
+}

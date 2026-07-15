@@ -1,0 +1,57 @@
+{
+  "ambiguous_recurrence_epoch0": {
+    "quadrant_counts": {
+      "productive_expansion": 1,
+      "useful_recurrence": 0,
+      "unproductive_expansion": 1,
+      "latent_absorption": 10
+    },
+    "latent_absorption_fraction": 0.8333333333333334,
+    "terminal_quadrant": "latent_absorption",
+    "absorbed": true
+  },
+  "clean_convergence_epoch0": {
+    "quadrant_counts": {
+      "productive_expansion": 1,
+      "useful_recurrence": 11,
+      "unproductive_expansion": 0,
+      "latent_absorption": 0
+    },
+    "latent_absorption_fraction": 0.0,
+    "terminal_quadrant": "useful_recurrence",
+    "absorbed": false
+  },
+  "confidently_wrong_epoch0": {
+    "quadrant_counts": {
+      "productive_expansion": 3,
+      "useful_recurrence": 9,
+      "unproductive_expansion": 0,
+      "latent_absorption": 0
+    },
+    "latent_absorption_fraction": 0.0,
+    "terminal_quadrant": "useful_recurrence",
+    "absorbed": false
+  },
+  "intent_switch_epoch0": {
+    "quadrant_counts": {
+      "productive_expansion": 2,
+      "useful_recurrence": 6,
+      "unproductive_expansion": 0,
+      "latent_absorption": 0
+    },
+    "latent_absorption_fraction": 0.0,
+    "terminal_quadrant": "useful_recurrence",
+    "absorbed": false
+  },
+  "intent_switch_epoch1": {
+    "quadrant_counts": {
+      "productive_expansion": 1,
+      "useful_recurrence": 7,
+      "unproductive_expansion": 0,
+      "latent_absorption": 0
+    },
+    "latent_absorption_fraction": 0.0,
+    "terminal_quadrant": "useful_recurrence",
+    "absorbed": false
+  }
+}

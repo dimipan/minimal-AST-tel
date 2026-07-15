@@ -1,0 +1,57 @@
+{
+  "ambiguous_recurrence_epoch0": {
+    "regimes": {
+      "productive": 1,
+      "churn": 10,
+      "quiet_incomplete": 1,
+      "converged": 0
+    },
+    "pathology_index": 0.8333333333333334,
+    "pathological": true,
+    "terminal_regime": "churn"
+  },
+  "clean_convergence_epoch0": {
+    "regimes": {
+      "productive": 12,
+      "churn": 0,
+      "quiet_incomplete": 0,
+      "converged": 0
+    },
+    "pathology_index": 0.0,
+    "pathological": false,
+    "terminal_regime": "productive"
+  },
+  "confidently_wrong_epoch0": {
+    "regimes": {
+      "productive": 12,
+      "churn": 0,
+      "quiet_incomplete": 0,
+      "converged": 0
+    },
+    "pathology_index": 0.0,
+    "pathological": false,
+    "terminal_regime": "productive"
+  },
+  "intent_switch_epoch0": {
+    "regimes": {
+      "productive": 8,
+      "churn": 0,
+      "quiet_incomplete": 0,
+      "converged": 0
+    },
+    "pathology_index": 0.0,
+    "pathological": false,
+    "terminal_regime": "productive"
+  },
+  "intent_switch_epoch1": {
+    "regimes": {
+      "productive": 8,
+      "churn": 0,
+      "quiet_incomplete": 0,
+      "converged": 0
+    },
+    "pathology_index": 0.0,
+    "pathological": false,
+    "terminal_regime": "productive"
+  }
+}

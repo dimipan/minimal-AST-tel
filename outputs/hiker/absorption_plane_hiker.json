@@ -1,0 +1,35 @@
+{
+  "agent_repetition": {
+    "quadrant_counts": {
+      "productive_expansion": 4,
+      "useful_recurrence": 0,
+      "unproductive_expansion": 5,
+      "latent_absorption": 0
+    },
+    "latent_absorption_fraction": 0.0,
+    "terminal_quadrant": "unproductive_expansion",
+    "absorbed": false
+  },
+  "efficient": {
+    "quadrant_counts": {
+      "productive_expansion": 9,
+      "useful_recurrence": 0,
+      "unproductive_expansion": 0,
+      "latent_absorption": 0
+    },
+    "latent_absorption_fraction": 0.0,
+    "terminal_quadrant": "productive_expansion",
+    "absorbed": false
+  },
+  "interviewee_degradation": {
+    "quadrant_counts": {
+      "productive_expansion": 4,
+      "useful_recurrence": 0,
+      "unproductive_expansion": 4,
+      "latent_absorption": 0
+    },
+    "latent_absorption_fraction": 0.0,
+    "terminal_quadrant": "unproductive_expansion",
+    "absorbed": false
+  }
+}

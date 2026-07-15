@@ -1,0 +1,35 @@
+{
+  "agent_repetition": {
+    "regimes": {
+      "productive": 4,
+      "churn": 0,
+      "quiet_incomplete": 0,
+      "converged": 5
+    },
+    "pathology_index": 0.0,
+    "pathological": false,
+    "terminal_regime": "converged"
+  },
+  "efficient": {
+    "regimes": {
+      "productive": 9,
+      "churn": 0,
+      "quiet_incomplete": 0,
+      "converged": 0
+    },
+    "pathology_index": 0.0,
+    "pathological": false,
+    "terminal_regime": "productive"
+  },
+  "interviewee_degradation": {
+    "regimes": {
+      "productive": 4,
+      "churn": 3,
+      "quiet_incomplete": 0,
+      "converged": 1
+    },
+    "pathology_index": 0.375,
+    "pathological": true,
+    "terminal_regime": "churn"
+  }
+}

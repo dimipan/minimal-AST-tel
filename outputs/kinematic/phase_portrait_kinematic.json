@@ -1,0 +1,35 @@
+{
+  "clean": {
+    "regimes": {
+      "productive": 22,
+      "churn": 0,
+      "quiet_incomplete": 0,
+      "converged": 1
+    },
+    "pathology_index": 0.0,
+    "pathological": false,
+    "terminal_regime": "converged"
+  },
+  "orbit_stall": {
+    "regimes": {
+      "productive": 6,
+      "churn": 17,
+      "quiet_incomplete": 0,
+      "converged": 1
+    },
+    "pathology_index": 0.7083333333333334,
+    "pathological": true,
+    "terminal_regime": "churn"
+  },
+  "saturated_hold": {
+    "regimes": {
+      "productive": 22,
+      "churn": 0,
+      "quiet_incomplete": 0,
+      "converged": 9
+    },
+    "pathology_index": 0.0,
+    "pathological": false,
+    "terminal_regime": "converged"
+  }
+}
