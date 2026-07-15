@@ -81,7 +81,7 @@ class SyntheticSarEnv(gym.Env):
         *, 
         ast_observation: bool, 
         si_penalty: float = 5.0, 
-        max_turns: int = 10,
+        max_turns: int = 100,
         discount_factor: float = 0.6,
         tau: float = 0.8
     ):
@@ -195,8 +195,8 @@ def main() -> None:
     parser.add_argument("--variant", choices=("baseline", "ast"), default="ast")
     parser.add_argument("--steps", type=int, default=100_000)
     parser.add_argument("--seed", type=int, default=222)
-    parser.add_argument("--discount", type=float, default=0.8)
-    parser.add_argument("--tau", type=float, default=0.6)
+    parser.add_argument("--discount", type=float, default=0.9)
+    parser.add_argument("--tau", type=float, default=0.7)
     parser.add_argument("--si-penalty", type=float, default=5.0)
     parser.add_argument("--model-out", type=Path, default=Path("outputs/ppo_ast_demo"))
     args = parser.parse_args()
