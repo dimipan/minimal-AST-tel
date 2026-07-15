@@ -10,16 +10,15 @@ work it already finished? It reads two channels off the live trajectory:
 - **PE** — how much of the task is still unresolved.
 - **SI** — whether incoming evidence is recurring without producing anything new.
 
-The reason this repository exists is one claim: **the same measurement works no
+The reason this repository exists is that **the same measurement works no
 matter what the process is.** The equations don't know whether they're watching a
 conversation, a robot, or another algorithm. To show that, the same frozen monitor
-is bound to three deliberately different processes — a witness interview, a robot
-arm, and a Bayesian estimator — and asked the same question of each.
+is bound to three deliberately different dummy processes (e.g., a witness interview, a robot
+arm, and a Bayesian estimator) and asked the same question of each.
 
-Everything here is synthetic and small. That's the point: it's fully inspectable,
+Everything here is simplified, synthetic and small. Fully inspectable,
 runs in under a minute, needs no GPU or simulator, and every result below
-reproduces from a clean clone. The environments are simplified on purpose — this is
-the *method*, stripped to where you can read all of it, not the full study.
+reproduces from a clean clone. The environments are simplified on purpose.
 
 ```bash
 pip install -e .
@@ -45,8 +44,7 @@ e  how to represent it          evidence -> a vector
 
 Everything after that line is shared and identical across all three processes: the
 state integrator, the PE and SI equations, the calibration constants. Write those
-four things and the monitor works on your process. That is the entire claim, and
-the three substrates are the test of it.
+four things and the monitor works on your process.
 
 Both channels come from one file — `telemetry_tools_geometric.py` — and every
 substrate writes the same JSONL trajectory format, which is what lets the
@@ -87,7 +85,7 @@ runs:
 | **saturated hold** | the arm finishes, then hovers doing nothing | 0.040 | no alarm |
 
 The last two rows are the whole idea in miniature. **Both are "the robot is doing
-nothing new."** A naive repetition detector trips on both. The monitor fires on the
+nothing new."** The monitor fires on the
 orbit — where the task is unfinished — and stays silent on the hold — where it's
 done. That difference is why SI is multiplied by `(1 − completeness)`: an idle robot
 that finished its job is not stalled. `saturated_hold` is the most important control
@@ -96,7 +94,7 @@ in the repo — the one that shows AST measures **stalling**, not merely **repet
 ### 3. Bayesian intent estimator (another inference process)
 
 Not a task at all. A recursive Bayesian estimator infers which of four goals an
-operator intends; AST watches *the estimator* — is evidence still resolving intent,
+operator intends to drive towards; AST watches *the estimator* — is evidence still resolving intent,
 or is it spinning?
 
 | run | what happens | mean SI | estimator right? |
@@ -110,11 +108,11 @@ Pooled AUC **1.000**, with real margin (quietest stall 0.191 > loudest clean 0.1
 
 Read the last row twice. In `confidently_wrong` the estimator resolves cleanly and
 confidently, completeness reaches **0.935**, SI stays at **0.077** — and it is wrong
-in every single window. SI is *right* to be quiet: the estimator isn't stuck, it's
+in every single window. SI is *right* to be quiet because the estimator isn't stuck, but it's
 confident and mistaken, which is a different failure.
 
 > **AST tells you whether a process is still learning. It cannot tell you whether
-> what it learned is true.** That's a hard limit, shown here rather than hedged.
+> what it learned is true.**
 
 ---
 
@@ -168,8 +166,7 @@ truth enters only as a label for evaluation.
 
 The three substrates all write the same trajectory format, so a single layer can
 read any of them and place every exchange in a **regime** — no substrate, no
-binding, no monitor imported. This is what the two channels are *for*: not a scalar
-alarm, but a map of where a process is in its acquisition.
+binding, no monitor imported. This is what the two channels are *for*: a map of where a process is in its acquisition.
 
 ```bash
 python phase_space_report.py outputs/boir/*.jsonl
@@ -201,19 +198,19 @@ What the runs actually produce:
 | interview | **interviewee_degradation (0.38)** | efficient, **agent_repetition (0.00)** |
 
 Two of these are worth pausing on, because **different substrates put their stalls
-in different regimes — and that is the layer working, not failing.**
+in different regimes and that is the layer working.**
 
 - **Kinematic `saturated_hold` → not a stall.** The robot that finished and idles is
   zero-yield forever, but pressure has drained, so it lands in `converged`, not
   `churn`. The plane gets it right on a substrate it was never tuned for.
 
 - **Interview `agent_repetition` → not churn; `interviewee_degradation` → churn.**
-  These are both "stalls" by mean SI, but the phase space splits them, correctly.
+  These are both "stalls" by mean SI, but the phase space splits them.
   Re-asking about location (already 78% resolved) is damped by the `(1 − completeness)`
   term and reads as `converged` — the schema was nearly closed, so there's little
   friction to register. Degradation hammers equipment (stuck at 20%) and reads as
   `churn`. The phase space is *stricter* than mean SI, and the extra structure is
-  the interview substrate telling you these two stalls are not the same animal.
+  the interview substrate telling us these two stalls are not the same animal.
 
 ---
 
@@ -262,7 +259,7 @@ looks like sitting still (absorption). In language, being stuck can look like
 fluent motion that goes nowhere (unproductive expansion). Same monitor, same
 primitives — the substrate decides which face a stall wears.
 
-**One honest boundary.** The absorption quadrant is purely geometric — low novelty,
+**boundary.** The absorption quadrant is purely geometric — low novelty,
 low yield. A robot that *finishes* and idles also shows both, so absorption alone
 flags kinematic `saturated_hold` (0.26) even though it isn't stuck. Only residual
 pressure (PE) separates "done" from "stuck," which is exactly what `phase_space.py`
@@ -270,12 +267,12 @@ adds, correctly calling that hold `converged`. Read the two views together: late
 absorption names the *kind* of non-progress; phase space says whether the schema is
 still *open*.
 
-*(The quadrant partition is also the natural place to state later guarantees:
+<!-- *(The quadrant partition is also the natural place to state later guarantees:
 membership is a set defined on two telemetry primitives, so properties like "a
 trajectory that enters latent absorption and stays N steps satisfies X," or "an
 intervention that raises novelty must cross the absorption/expansion boundary," are
 statable against it — which they are not against a scalar. That is where this line
-of work goes next.)*
+of work goes next.)* -->
 
 ---
 
@@ -295,12 +292,12 @@ in the pipeline. The same frozen monitor, unchanged, produces coherent and
 *distinct* readings on language, control, and inference, and the phase space
 organises those readings into regimes that transfer across all three.
 
-**Future work** is refining the primitives and chasing the core of what a
+<!-- **Future work** is refining the primitives and chasing the core of what a
 "reasoning-integrity regime" is: sharper novelty and yield estimators, the
 guarantees the quadrant partition invites, and — the direction this is really aimed
 at — instrumenting the internal trajectory of a model's own reasoning, where the
 same two questions (is this making progress, or recurring without yield) become a
-statement about computation rather than about a task.
+statement about computation rather than about a task. -->
 
 ---
 
